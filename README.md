@@ -3,7 +3,7 @@ R scripts analysing and assessing geographic variation in dietary niche width of
 
 The purpose of this repository is to enable the reproduction of the figures in the [/figs](./figs) directory using the scripts in [/R](./R) and the data in [/data](./data). 
 
-Roughly, the recipe for reproducing the figures are:
+Roughly, the recipe for reproducing the figures is:
 
  1. get species interaction data from [GloBI](http://globalbioticinteractions.org) using the [rglobi](https://github.com/ropensci/rglobi) package. (see [R/GeoDietNiche.R](./R/GeoDietNiche.R))
  1. get species occurrence data from [GBIF](http://gbif.org) using the [rgbif](https://github.com/ropensci/rgbif) package. (see [R/GeoDietNiche.R](./R/GeoDietNiche.R))
