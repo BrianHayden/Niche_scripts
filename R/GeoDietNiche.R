@@ -63,7 +63,7 @@ ReportProgress <- function() {
 }
 
 # Limited to Sharks (Elasmobranchii) for now.
-GetPredatorTaxa <- function(rank = "Species", predator.taxa = list('Elasmobranchii'), skip = 0, limit = 25, opts = list(port = 7474)) {
+GetPredatorTaxa <- function(rank = "Species", predator.taxa = list('Elasmobranchii'), skip = 0, limit = 25, opts = list(port = 80)) {
   luceneQuery <- paste('path:', predator.taxa, ' ', sep='', collapse='')
   cypher <- paste("START predatorTaxon = node:taxonPaths('", luceneQuery , "') MATCH ", predator.match.clause, " WHERE has(predatorTaxon.rank) AND predatorTaxon.rank = '", rank, "' RETURN distinct(predatorTaxon.name) as `predator.taxon.name`", sep="")
   if (!is.null(limit) && !is.null(skip)) {
@@ -112,7 +112,7 @@ GetPreyCategories <- function() {
 
 # Retrieves diet items of given predator and classifies them by matching the prey categories against 
 # both taxon hierarchy of prey and the name that was originally used to describe the prey.
-UniquePreyTaxaOfPredator <- function(predator.taxon.name, prey.categories, opts = list(port = 7474)) {
+UniquePreyTaxaOfPredator <- function(predator.taxon.name, prey.categories, opts = list(port = 80)) {
   cypher <- paste("START predatorTaxon = node:taxons(name='", predator.taxon.name, "') MATCH ", predator.match.clause, ", prey-[:ORIGINALLY_DESCRIBED_AS]->preyTaxonOrig WHERE has(preyTaxon.path) RETURN distinct(preyTaxonOrig.name) as `prey.taxon.name.orig`, preyTaxon.path as `prey.taxon.path`", sep="")
   result <- rglobi::query(cypher, opts = opts)
   ReportProgress()
@@ -170,18 +170,10 @@ DownloadFile <- function(url, file) {
   a 
 }
 
-GetTittensorProjection <- function() {
-  CRS("+proj=longlat +datum=WGS84")
-}
-
-GetTisseuilProjection <- function() {
-  CRS("+proj=longlat +datum=WGS84 +no_defs")
-}
-
 # see Tittensor et al. 2010 in nature 
 # http://dx.doi.org/10.1038/nature09329
 GetTittensorShapes <- function() {
-  list(url='http://www.mathstat.dal.ca/~derekt/publications/global_patterns_and_predictors_of_marine_biodiversity_across_taxa.zip', file = 'Global_patterns_predictors_marine_biodiversity_across_taxa.shp', diversity.metric = 'AllNorm', name='tittensor2010', proj4string = CRS("+proj=longlat +datum=WGS84 +no_defs")) 
+  list(url='http://www.mathstat.dal.ca/~derekt/publications/global_patterns_and_predictors_of_marine_biodiversity_across_taxa.zip', file = 'Global_patterns_predictors_marine_biodiversity_across_taxa.shp', diversity.metric = 'AllNorm', name='tittensor2010', proj4string = GetTittensorProjection()) 
 }
 
 # see 2013 Tisseuil et al. paper in Journal of Animal Ecology http://dx.doi.org/10.1111/1365-2656.12018
@@ -189,7 +181,7 @@ GetTittensorShapes <- function() {
 GetTisseuilShapes <- function() {
   shapefile.name <- '/commondata/data0/bv_clemANR.shp'
   shapefile.url <- 'https://globi.s3.amazonaws.com/datasets/org/eol/globi/geo/tisseuil2013/0.1/tisseuil2013-0.1-Fish_TotNativSpec.zip'
-  list(url=shapefile.url, file=shapefile.name, diversity.metric='fish_endem', name='tisseuil2013', proj4string = CRS("+proj=longlat +datum=WGS84 +no_defs")) 
+  list(url=shapefile.url, file=shapefile.name, diversity.metric='fish_endem', name='tisseuil2013', proj4string = GetTisseuilProjection()) 
 }
 
 # Retrieve and read biodiversity maps, uses tittensor by default
@@ -205,8 +197,20 @@ ReadBiodiversityShapes <- function(shapes = GetTittensorShapes()) {
   shapes
 }
 
-CreateSpatialPoint <- function(lat, lng) {
-  SpatialPoints(data.frame(c(lng), c(lat)), proj4string = GetProjection())
+GetProjection <- function() {
+  CRS("+proj=longlat +datum=WGS84 +no_defs")
+}
+
+GetTittensorProjection <- function() {
+  GetProjection()
+}
+     
+GetTisseuilProjection <- function() {
+  GetProjection()
+}
+
+CreateSpatialPoint <- function(lat, lng, proj4string = GetProjection()) {
+  SpatialPoints(data.frame(c(lng), c(lat)), proj4string)
 }
 
 # Retrieve biodiversity information at specified points
@@ -243,11 +247,11 @@ GetLocationsForSpeciesGBIF <- function(scientificName, opts = list(occurrence.li
   }
 }
 
-GetLocationsForSpeciesGLOBI <- function(scientificName, opts = list(occurrence.limit = 20, port = '7474')) {
+GetLocationsForSpeciesGLOBI <- function(scientificName, opts = list(occurrence.limit = 20, port = '80')) {
   rglobi::query(paste("START taxon = node:taxons(name='", scientificName, "') MATCH loc<-[:COLLECTED_AT]-specimen-[:CLASSIFIED_AS]->taxon RETURN loc.latitude as `decimalLatitude`, loc.longitude as `decimalLongitude` LIMIT ", opts$occurrence.limit, sep=''), opts) 
 }
 
-GetLocationsForSpecies <- function(scientificName, div.map, opts = list(occurrence.source = 'GBIF', occurrence.limit = 20, port = '7474')) {
+GetLocationsForSpecies <- function(scientificName, div.map, opts = list(occurrence.source = 'GBIF', occurrence.limit = 20, port = '80')) {
   factory <- list('GBIF' = GetLocationsForSpeciesGBIF, 'GLOBI' = GetLocationsForSpeciesGLOBI)
   zones <- NA
   source <- opts$occurrence.source
@@ -263,12 +267,12 @@ GetLocationsForSpecies <- function(scientificName, div.map, opts = list(occurren
 # Uses occurrence lat/lng pairs from specified source. Supported Sources are 'GBIF' and 'GLOBI'. By default GBIF is selected.
 #
 # Example:
-#	DiversityVsNicheWidth(diet.matrix, opts = list(occurrence.source = 'GLOBI', occurrence.limit = 1024, port = 7474))
+#	DiversityVsNicheWidth(diet.matrix, opts = list(occurrence.source = 'GLOBI', occurrence.limit = 1024, port = 80))
 #
-# The example selects up to 1024 occurrence locations from GloBI on port 7474. Also, because the diversity map is not provided, a map is downloaded. 
+# The example selects up to 1024 occurrence locations from GloBI on port 80. Also, because the diversity map is not provided, a map is downloaded. 
 #
 
-DiversityVsNicheWidth <- function(diet.matrix, shapes = ReadBiodiversityShapes(), opts = list(occurrence.source = 'GBIF', occurrence.limit = 20, port = '7474')) {
+DiversityVsNicheWidth <- function(diet.matrix, shapes = ReadBiodiversityShapes(), opts = list(occurrence.source = 'GBIF', occurrence.limit = 20, port = '80')) {
   message('aggregating diet.matrix with provided diversity map', appendLF=FALSE)
   
   rows <- apply(diet.matrix, MARGIN=1, function(row) {
@@ -348,11 +352,15 @@ opts.dark <- list(port=80, predator.species.limit = 128, occurrence.limit = 32)
 
 CompileGeoDiet <- function (consumers = list('Actinopterygii'), opts = opts.dark) {
   results <- list()
+  message('compiling marine diets...')
   tittensor.shapes <- ReadBiodiversityShapes(shapes = GetTittensorShapes())
   results$tittensor <- CalculateDietDiversity(consumers, tittensor.shapes, 'GBIF', opts = opts, name.filter = IncludeMarineButNotFreshwaterSpecies)
-  
+  message('compiling marine diets done.')
+
+  message('compiling freshwater diets...')
   tisseuil.shapes <- ReadBiodiversityShapes(shapes = GetTisseuilShapes()) 
   results$tisseuil <- CalculateDietDiversity(consumers, tisseuil.shapes, 'GBIF', opts = opts, name.filter=IncludeFreshwaterButNotMarineSpecies)
+  message('compiling freshwater diets done.')
   results
 }
 # Plot Global Dietary Niche Maps by overlaying a lat lng raster onto a map of the world.
