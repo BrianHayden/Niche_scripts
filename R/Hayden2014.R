@@ -9,8 +9,8 @@
 # 6. devtools::source_url('https://gist.githubusercontent.com/jhpoelen/81b4eced3963633b96cb/raw/Hayden2014.R')
 #
 #
-# Configuration options
-opts.dark <- list(port=7574, predator.species.limit = 128, occurrence.limit = 32)
+# Configuration options (change for access to "Dark" GloBI)
+opts.dark <- list(port=7474, predator.species.limit = 128, occurrence.limit = 32)
 
 CalculateDietDiversity <- function(predator.taxa, shapes, occurrence.source, opts, name.filter = function (x) {x}) {
   predator.taxon.names <- name.filter(GetPredatorTaxa(predator.taxa=predator.taxa, limit=opts$predator.species.limit, opts = opts))
